@@ -7,6 +7,7 @@ import ImprovedAddTodoModal from '../components/features/todos/ImprovedAddTodoMo
 import Button from '../components/ui/Button';
 import { useTranslation } from '../hooks/useTranslation';
 import { useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 type ViewMode = 'list' | 'grid' | 'week' | 'month';
 
@@ -53,28 +54,44 @@ const TodosPage: React.FC = () => {
     const startDate = getStartDateForRange(currentDate, daysToShow);
 
     return (
-        <div className="h-full flex flex-col p-4 md:p-6 lg:p-8">
-            <CalendarHeader
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                currentDate={currentDate}
-                onDateChange={setCurrentDate}
-                daysToShow={daysToShow}
-                onDaysChange={handleDaysChange}
-                onNewTask={() => setIsModalOpen(true)}
-                availableDayOptions={dayOptions}
-                onDaysStep={handleDaysStep}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                priorityFilter={priorityFilter}
-                onPriorityChange={setPriorityFilter}
-                tagFilter={tagFilter}
-                onTagFilterChange={setTagFilter}
-            />
-            
-            <div className="flex-1 overflow-hidden min-h-0">
+        <motion.div
+            className="h-full flex flex-col p-4 md:p-6 lg:p-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+        >
+            <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+            >
+                <CalendarHeader
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    currentDate={currentDate}
+                    onDateChange={setCurrentDate}
+                    daysToShow={daysToShow}
+                    onDaysChange={handleDaysChange}
+                    onNewTask={() => setIsModalOpen(true)}
+                    availableDayOptions={dayOptions}
+                    onDaysStep={handleDaysStep}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    priorityFilter={priorityFilter}
+                    onPriorityChange={setPriorityFilter}
+                    tagFilter={tagFilter}
+                    onTagFilterChange={setTagFilter}
+                />
+            </motion.div>
+
+            <motion.div
+                className="flex-1 overflow-hidden min-h-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+            >
                  {viewMode === 'list' ? (
-                    <Calendar2Agenda 
+                    <Calendar2Agenda
                       startDate={startDate}
                       daysToShow={daysToShow}
                       searchTerm={searchTerm}
@@ -98,9 +115,9 @@ const TodosPage: React.FC = () => {
                       tagFilter={tagFilter}
                     />
                  )}
-            </div>
+            </motion.div>
             <ImprovedAddTodoModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-        </div>
+        </motion.div>
     );
 };
 

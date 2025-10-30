@@ -14,10 +14,10 @@ interface MessagePayload {
 }
 
 export default async (req: Request, context: Context) => {
-  // Validate environment variables
-  const GEMINI_API_KEY = Netlify.env.get('GEMINI_API_KEY');
-  const SUPABASE_URL = Netlify.env.get('SUPABASE_URL');
-  const SUPABASE_SERVICE_ROLE_KEY = Netlify.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  // Validate environment variables - Fixed: use process.env instead of Netlify.env.get()
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(
@@ -68,20 +68,27 @@ export default async (req: Request, context: Context) => {
     
     const userContext = `Current User: ${profile.username}, Level ${profile.level}.`;
     
-    // Call Gemini API
+    // Call Gemini API with timeout protection
     const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
     const contents = messages.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.text }]
     }));
 
-    const response = await ai.models.generateContent({
+    // Add timeout wrapper (30 seconds)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI request timeout after 30 seconds')), 30000)
+    );
+
+    const aiPromise = ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents: contents,
       config: {
         systemInstruction: `${SYSTEM_INSTRUCTION}\n${userContext}`,
       },
     });
+
+    const response = await Promise.race([aiPromise, timeoutPromise]) as any;
     
     return new Response(
       JSON.stringify({ response: response.text }),

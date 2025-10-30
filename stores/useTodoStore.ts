@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Todo } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { useToastStore } from './useToastStore';
+import { mapDbTodoToApp, mapAppChangesToDb, mapAppTodoToDbInsert } from '../utils/todoMappers';
 
 interface TodoState {
   todos: Todo[];
@@ -28,20 +29,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     if (error) {
       console.error('Error fetching todos:', error);
     } else {
-      // FIX: Map from database snake_case (due_date, is_completed) to application camelCase (dueDate, isCompleted)
-      const mappedTodos: Todo[] = (data || []).map(todo => ({
-        ...todo,
-        dueDate: todo.due_date,
-        isCompleted: todo.is_completed,
-        startTime: todo.start_time ?? undefined,
-        endTime: todo.end_time ?? undefined,
-        description: todo.description ?? undefined,
-        stakes: todo.stakes as any,
-        tags: todo.tags ?? undefined,
-        color: todo.color ?? undefined,
-        completedAt: (todo as any).completed_at ?? undefined,
-        projectId: undefined
-      }));
+      const mappedTodos = (data || []).map(mapDbTodoToApp);
       set({ todos: mappedTodos });
     }
   },
@@ -49,17 +37,13 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    // FIX: Map from application camelCase to database snake_case for insert
-    const { dueDate, startTime, endTime, ...rest } = newTodo;
+    const payload = mapAppTodoToDbInsert(newTodo);
     const { data, error } = await supabase
       .from('todos')
-      .insert([{ 
-        ...rest, 
+      .insert({
+        ...payload,
         user_id: session.user.id,
-        due_date: dueDate,
-        start_time: startTime,
-        end_time: endTime,
-      }])
+      } as any)
       .select()
       .single();
 
@@ -67,38 +51,14 @@ export const useTodoStore = create<TodoState>((set, get) => ({
       console.error('Error adding todo:', error);
       return null;
     } else if (data) {
-      // FIX: Map response from snake_case to camelCase before adding to store
-      const addedTodo: Todo = {
-        ...data,
-        dueDate: data.due_date,
-        isCompleted: data.is_completed,
-        startTime: data.start_time ?? undefined,
-        endTime: data.end_time ?? undefined,
-        description: data.description ?? undefined,
-        stakes: data.stakes as any,
-        tags: data.tags ?? undefined,
-        color: data.color ?? undefined,
-        completedAt: (data as any).completed_at ?? undefined,
-        projectId: undefined,
-      };
+      const addedTodo = mapDbTodoToApp(data);
       set((state) => ({ todos: [...state.todos, addedTodo] }));
       return addedTodo;
     }
     return null;
   },
   updateTodo: async (id, changes) => {
-    // Prepare payload (camelCase -> snake_case)
-    const payload: any = {};
-    if (changes.task !== undefined) payload.task = changes.task;
-    if (changes.description !== undefined) payload.description = changes.description;
-    if (changes.dueDate !== undefined) payload.due_date = changes.dueDate;
-    if (changes.startTime !== undefined) payload.start_time = changes.startTime;
-    if (changes.endTime !== undefined) payload.end_time = changes.endTime;
-    if (changes.priority !== undefined) payload.priority = changes.priority;
-    if (changes.tags !== undefined) payload.tags = changes.tags;
-    if (changes.color !== undefined) payload.color = changes.color;
-    if (changes.stakes !== undefined) payload.stakes = changes.stakes as any;
-    if (changes.isCompleted !== undefined) payload.is_completed = changes.isCompleted;
+    const payload = mapAppChangesToDb(changes);
 
     // Optimistic UI: apply local change first
     const prev = get().todos;

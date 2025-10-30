@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/useAuthStore';
 import { supabase } from './lib/supabaseClient';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoadingSpinner from './components/ui/LoadingSpinner';
 
 import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/LoginPage';
@@ -33,29 +35,39 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-         supabase.from('profiles').select('*').eq('id', session.user.id).single().then(({ data }) => {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
             setProfile(data);
-         });
+          });
       }
       setLoading(false);
     });
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        if (session) {
-           supabase.from('profiles').select('*').eq('id', session.user.id).single().then(({ data }) => {
-              setProfile(data);
-           });
-        } else {
-            setProfile(null);
-        }
-        if (_event === 'INITIAL_SESSION') {
-             setLoading(false);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            setProfile(data);
+          });
+      } else {
+        setProfile(null);
       }
-    );
+      if (_event === 'INITIAL_SESSION') {
+        setLoading(false);
+      }
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -73,29 +85,50 @@ const App: React.FC = () => {
     }
   }, [session, fetchTodos, fetchHabits, fetchItems, fetchQuests, fetchUserQuests]);
 
-
   if (loading) {
-    // You can replace this with a beautiful loading spinner component
-    return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="text-center">
+          <LoadingSpinner size="xl" variant="spinner" className="mb-4" />
+          <p className="text-slate-300 text-lg animate-pulse">Đang khởi động...</p>
+        </div>
+      </div>
+    );
   }
-  
+
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/login" element={!session ? <LoginPage /> : <Navigate to="/" />} />
-        <Route path="/" element={session && profile ? <MainLayout /> : <Navigate to="/login" />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="todos" element={<TodosPage />} />
-          <Route path="habits" element={<HabitsPage />} />
-          <Route path="quests" element={<QuestsPage />} />
-          <Route path="shop" element={<ShopPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="debug" element={<DebugPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to={session ? "/" : "/login"} />} />
-      </Routes>
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-950">
+              <LoadingSpinner size="lg" variant="dots" />
+            </div>
+          }
+        >
+          <Routes>
+            <Route
+              path="/login"
+              element={!session ? <LoginPage /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/"
+              element={session && profile ? <MainLayout /> : <Navigate to="/login" />}
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="todos" element={<TodosPage />} />
+              <Route path="habits" element={<HabitsPage />} />
+              <Route path="quests" element={<QuestsPage />} />
+              <Route path="shop" element={<ShopPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="debug" element={<DebugPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to={session ? '/' : '/login'} />} />
+          </Routes>
+        </Suspense>
+      </HashRouter>
+    </ErrorBoundary>
   );
 };
 

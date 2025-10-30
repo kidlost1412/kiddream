@@ -3,6 +3,9 @@ import { useInventoryStore, type InventoryItem } from '../stores/useInventorySto
 import { useTranslation } from '../hooks/useTranslation';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import { AnimatedPage, StaggerContainer, AnimatedItem } from '../components/AnimatedPage';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { motion } from 'framer-motion';
 
 const InventoryPage: React.FC = () => {
   const { items, loading, fetchInventory, useItem } = useInventoryStore();
@@ -59,59 +62,101 @@ const InventoryPage: React.FC = () => {
   };
 
   return (
-    <div className="animate-fade-in p-6 md:p-8 lg:p-10">
-      <div className="flex justify-between items-center mb-6">
+    <AnimatedPage className="p-6 md:p-8 lg:p-10">
+      <motion.div
+        className="flex justify-between items-center mb-6"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <h2 className="text-3xl font-bold text-white">{t('shop.inventory')}</h2>
-        <Button onClick={fetchInventory} disabled={loading} variant="secondary">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-          </svg>
-          Làm mới
-        </Button>
-      </div>
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button onClick={fetchInventory} disabled={loading} variant="secondary">
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" variant="dots" className="mr-2" />
+                Đang tải...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Làm mới
+              </>
+            )}
+          </Button>
+        </motion.div>
+      </motion.div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
+      <motion.div
+        className="flex flex-wrap gap-2 mb-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+      >
         {[
           { key: 'active', label: 'Đang dùng', count: items.filter(i => i.status === 'active').length },
           { key: 'used', label: 'Đã dùng', count: items.filter(i => i.status === 'used').length },
           { key: 'expired', label: 'Hết hạn', count: items.filter(i => i.status === 'expired').length },
           { key: 'all', label: 'Tất cả', count: items.length },
         ].map(({ key, label, count }) => (
-          <button
+          <motion.button
             key={key}
             onClick={() => setFilter(key as any)}
             className={`px-4 py-2 rounded-lg font-semibold transition-all ${
               filter === key
-                ? 'bg-indigo-500 text-white'
+                ? 'bg-indigo-500 text-white shadow-lg'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
             }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             {label} ({count})
-          </button>
+          </motion.button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Inventory Grid */}
       {loading ? (
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-          <p className="text-slate-400 mt-4">Đang tải...</p>
-        </div>
+        <motion.div
+          className="text-center py-12"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <LoadingSpinner size="xl" variant="spinner" className="mx-auto mb-4" />
+          <p className="text-slate-400">Đang tải kho đồ...</p>
+        </motion.div>
       ) : filteredItems.length === 0 ? (
-        <Card className="text-center py-12">
-          <div className="text-6xl mb-4">📦</div>
-          <p className="text-xl text-slate-400">{t('shop.noRewards')}</p>
-          <p className="text-sm text-slate-500 mt-2">Hãy mua phần thưởng từ cửa hàng!</p>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="text-center py-12">
+            <motion.div
+              className="text-6xl mb-4"
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+            >
+              📦
+            </motion.div>
+            <p className="text-xl text-slate-400">{t('shop.noRewards')}</p>
+            <p className="text-sm text-slate-500 mt-2">Hãy mua phần thưởng từ cửa hàng!</p>
+          </Card>
+        </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => {
             const daysLeft = getDaysUntilExpiry(item.expires_at);
             const isExpiringSoon = daysLeft !== null && daysLeft <= 3 && daysLeft > 0;
 
             return (
-              <Card key={item.id} className={`relative ${item.status !== 'active' ? 'opacity-60' : ''}`}>
+              <AnimatedItem key={item.id}>
+                <motion.div whileHover={{ scale: 1.02, y: -4 }} transition={{ duration: 0.2 }}>
+                  <Card className={`relative ${item.status !== 'active' ? 'opacity-60' : ''}`}>
                 {/* Status Badge */}
                 <div className="absolute top-4 right-4">
                   {getStatusBadge(item.status)}
@@ -167,12 +212,14 @@ const InventoryPage: React.FC = () => {
                     Vật phẩm vĩnh viễn
                   </div>
                 )}
-              </Card>
+                  </Card>
+                </motion.div>
+              </AnimatedItem>
             );
           })}
-        </div>
+        </StaggerContainer>
       )}
-    </div>
+    </AnimatedPage>
   );
 };
 
