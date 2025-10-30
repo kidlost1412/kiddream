@@ -1,18 +1,8 @@
 import React from 'react';
 import { Todo } from '../../../types';
 import { useTodoStore } from '../../../stores/useTodoStore';
-
-const timeToMinutes = (time: string): number => {
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + m;
-};
-
-const formatDateLocal = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-};
+import { timeToMinutes, formatLocalDate, parseLocalDate } from '../../../utils/dateHelpers';
+import { motion } from 'framer-motion';
 
 interface Calendar2EventProps {
   todo: Todo;
@@ -196,10 +186,9 @@ const Calendar2Event: React.FC<Calendar2EventProps> = ({ todo, gridStartHour, gr
         const toHM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
         let nextDue = todo.dueDate;
         if (deltaDays !== 0) {
-          const [y,m,day] = todo.dueDate.split('-').map(Number);
-          const d = new Date(y, (m||1)-1, day||1);
+          const d = parseLocalDate(todo.dueDate);
           d.setDate(d.getDate() + deltaDays);
-          nextDue = formatDateLocal(d);
+          nextDue = formatLocalDate(d);
         }
         await updateTodo(todo.id, { dueDate: nextDue, startTime: toHM(ns), endTime: toHM(ne) });
         // Group apply for multi-select move only
@@ -273,10 +262,9 @@ const Calendar2Event: React.FC<Calendar2EventProps> = ({ todo, gridStartHour, gr
       e.preventDefault();
       const dir = e.key === 'ArrowLeft' ? -1 : 1;
       const by = e.shiftKey ? 7 : 1;
-      const [y,m,day] = todo.dueDate.split('-').map(Number);
-      const d = new Date(y, (m||1)-1, day||1);
+      const d = parseLocalDate(todo.dueDate);
       d.setDate(d.getDate() + dir*by);
-      nextDue = formatDateLocal(d);
+      nextDue = formatLocalDate(d);
       changed = true;
     }
 
@@ -395,10 +383,9 @@ const Calendar2Event: React.FC<Calendar2EventProps> = ({ todo, gridStartHour, gr
         const toHM = (m: number) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
         let nextDue = todo.dueDate;
         if (deltaDays !== 0) {
-          const [y,m,day] = todo.dueDate.split('-').map(Number);
-          const d = new Date(y, (m||1)-1, day||1);
+          const d = parseLocalDate(todo.dueDate);
           d.setDate(d.getDate() + deltaDays);
-          nextDue = formatDateLocal(d);
+          nextDue = formatLocalDate(d);
         }
         await updateTodo(todo.id, { dueDate: nextDue, startTime: toHM(ns), endTime: toHM(ne) });
       }

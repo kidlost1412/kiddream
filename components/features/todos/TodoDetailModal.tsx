@@ -7,6 +7,8 @@ import { supabase } from '../../../lib/supabaseClient';
 import EditTodoModal from './EditTodoModal';
 import { useToastStore } from '../../../stores/useToastStore';
 import ConfirmDialog from '../../ui/ConfirmDialog';
+import { motion, AnimatePresence } from 'framer-motion';
+import { formatLocalizedDate } from '../../../utils/dateHelpers';
 
 interface TodoDetailModalProps {
   todo: Todo | null;
@@ -37,8 +39,6 @@ const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ todo, isOpen, onClose
     };
     if (isOpen) load();
   }, [isOpen, todo?.id]);
-
-  if (!isOpen || !todo) return null;
 
   const handleToggle = async () => {
     if (!liveTodo) return;
@@ -73,15 +73,27 @@ const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ todo, isOpen, onClose
     return colors[priority] || 'text-yellow-400';
   };
 
+  if (!isOpen || !todo) return null;
+
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-slate-800 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
+            className="bg-slate-800 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div className="flex-1">
@@ -129,12 +141,7 @@ const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ todo, isOpen, onClose
               Ngày hết hạn
             </div>
             <p className="text-white font-semibold">
-              {new Date(liveTodo!.dueDate).toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
+              {formatLocalizedDate(liveTodo!.dueDate)}
             </p>
           </div>
 
@@ -318,8 +325,10 @@ const TodoDetailModal: React.FC<TodoDetailModalProps> = ({ todo, isOpen, onClose
           onConfirm={deleting ? () => {} : confirmDelete}
           onCancel={() => !deleting && setConfirmOpen(false)}
         />
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
