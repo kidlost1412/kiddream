@@ -1,0 +1,391 @@
+
+-- =================================================================
+-- ZENQUEST DATABASE SCHEMA
+-- =================================================================
+-- This script sets up the entire database structure for the ZenQuest app.
+-- It includes table definitions, functions, triggers, and Row Level Security policies.
+-- Run this script in your Supabase SQL Editor.
+-- =================================================================
+
+-- ----------------------------------------
+-- TABLE: profiles
+-- Stores public user data, linked to the auth.users table.
+-- ----------------------------------------
+CREATE TABLE public.profiles (
+    id uuid NOT NULL PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
+    username text NOT NULL UNIQUE,
+    avatar_url text,
+    level integer NOT NULL DEFAULT 1,
+    xp integer NOT NULL DEFAULT 0,
+    points integer NOT NULL DEFAULT 100,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+COMMENT ON TABLE public.profiles IS 'Stores public-facing profile information for each user.';
+
+-- ----------------------------------------
+-- TABLE: todos
+-- Stores individual to-do items for users.
+-- ----------------------------------------
+CREATE TABLE public.todos (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.profiles ON DELETE CASCADE,
+    task text NOT NULL,
+    description text,
+    due_date date NOT NULL,
+    start_time time without time zone,
+    end_time time without time zone,
+    priority integer NOT NULL DEFAULT 0, -- 0: Low, 1: Medium, 2: High
+    is_completed boolean NOT NULL DEFAULT false,
+    color text,
+    tags text[],
+    stakes jsonb, -- { "reward": 10, "penalty": 5 }
+    created_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone
+);
+
+COMMENT ON TABLE public.todos IS 'Stores all the to-do items created by users.';
+
+-- ----------------------------------------
+-- TABLE: habits
+-- Stores habit definitions for users.
+-- ----------------------------------------
+CREATE TABLE public.habits (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.profiles ON DELETE CASCADE,
+    name text NOT NULL,
+    icon text,
+    category text,
+    goal text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+COMMENT ON TABLE public.habits IS 'Defines the habits a user wants to track.';
+
+-- ----------------------------------------
+-- TABLE: habit_logs
+-- Stores completion records for each habit on a given day.
+-- ----------------------------------------
+CREATE TABLE public.habit_logs (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    habit_id uuid NOT NULL REFERENCES public.habits ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES public.profiles ON DELETE CASCADE,
+    completed_at date NOT NULL DEFAULT CURRENT_DATE,
+    UNIQUE(habit_id, completed_at)
+);
+
+COMMENT ON TABLE public.habit_logs IS 'Tracks each time a user completes a habit.';
+
+-- ----------------------------------------
+-- TABLE: rewards (Shop Items)
+-- Stores items available for purchase in the shop.
+-- ----------------------------------------
+CREATE TABLE public.rewards (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    name text NOT NULL,
+    description text,
+    cost integer NOT NULL,
+    icon text,
+    category text
+);
+
+COMMENT ON TABLE public.rewards IS 'Defines the rewards available in the in-app shop.';
+
+-- ----------------------------------------
+-- TABLE: quests
+-- Stores the definitions of available quests.
+-- ----------------------------------------
+CREATE TABLE public.quests (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    title text NOT NULL,
+    description text,
+    type text NOT NULL, -- 'main' or 'side'
+    goals jsonb, -- [{ "description": "Complete 5 tasks", "target": 5, "type": "todo_completion" }]
+    rewards jsonb, -- { "xp": 500, "points": 100 }
+    background_image text
+);
+
+COMMENT ON TABLE public.quests IS 'Stores master definitions for all available quests.';
+
+-- ----------------------------------------
+-- TABLE: user_quests
+-- Tracks user progress on specific quests.
+-- ----------------------------------------
+CREATE TABLE public.user_quests (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.profiles ON DELETE CASCADE,
+    quest_id uuid NOT NULL REFERENCES public.quests ON DELETE CASCADE,
+    status text NOT NULL DEFAULT 'in_progress', -- 'in_progress', 'completed'
+    progress jsonb,
+    started_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone,
+    UNIQUE(user_id, quest_id)
+);
+
+COMMENT ON TABLE public.user_quests IS 'Tracks the progress of a user for a specific quest.';
+
+-- ----------------------------------------
+-- TABLE: ai_memory
+-- Stores contextual information for the AI assistant.
+-- ----------------------------------------
+CREATE TABLE public.ai_memory (
+    id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.profiles ON DELETE CASCADE,
+    memory_key text NOT NULL,
+    memory_value text,
+    last_updated timestamp with time zone DEFAULT now(),
+    UNIQUE(user_id, memory_key)
+);
+
+COMMENT ON TABLE public.ai_memory IS 'Stores long-term memory for the AI assistant for personalization.';
+
+-- =================================================================
+-- FUNCTIONS & TRIGGERS
+-- =================================================================
+
+-- ----------------------------------------
+-- FUNCTION: handle_new_user
+-- Creates a new profile entry when a user signs up.
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'username',
+    'https://api.dicebear.com/8.x/bottts/svg?seed=' || (NEW.raw_user_meta_data->>'username')
+  );
+  RETURN NEW;
+END;
+$$;
+
+-- ----------------------------------------
+-- TRIGGER: on_auth_user_created
+-- Calls handle_new_user after a new user is created in auth.users.
+-- ----------------------------------------
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ----------------------------------------
+-- FUNCTION: handle_todo_completion
+-- Awards/penalizes points and XP when a todo's status changes.
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_todo_completion_reward()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  reward_points int;
+  penalty_points int;
+  xp_reward int;
+BEGIN
+  -- Only run if is_completed status has changed
+  IF OLD.is_completed IS DISTINCT FROM NEW.is_completed THEN
+    -- Extract reward and penalty from stakes JSON
+    reward_points := (NEW.stakes->>'reward')::int;
+    penalty_points := (NEW.stakes->>'penalty')::int;
+    -- Simple XP formula: reward points / 2
+    xp_reward := reward_points / 2;
+
+    IF NEW.is_completed = true THEN
+      -- User completed the task, grant rewards
+      UPDATE public.profiles
+      SET
+        points = points + reward_points,
+        xp = xp + xp_reward
+      WHERE id = NEW.user_id;
+      -- Set completion timestamp
+      NEW.completed_at := now();
+    ELSE
+      -- User un-completed the task, apply penalty
+      UPDATE public.profiles
+      SET
+        points = points - penalty_points
+      WHERE id = NEW.user_id;
+      -- Clear completion timestamp
+      NEW.completed_at := NULL;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- ----------------------------------------
+-- TRIGGER: on_todo_update_completion
+-- Calls handle_todo_completion_reward when a todo is updated.
+-- ----------------------------------------
+CREATE TRIGGER on_todo_update_completion
+  BEFORE UPDATE ON public.todos
+  FOR EACH ROW EXECUTE FUNCTION public.handle_todo_completion_reward();
+
+-- =================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =================================================================
+-- Enable RLS and define policies to ensure users can only access their own data.
+
+-- ----------------------------------------
+-- RLS for: profiles
+-- ----------------------------------------
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own profile."
+ON public.profiles FOR SELECT
+USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile."
+ON public.profiles FOR UPDATE
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+-- ----------------------------------------
+-- RLS for: todos
+-- ----------------------------------------
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own todos."
+ON public.todos FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own todos."
+ON public.todos FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own todos."
+ON public.todos FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own todos."
+ON public.todos FOR DELETE
+USING (auth.uid() = user_id);
+
+-- ----------------------------------------
+-- RLS for: habits
+-- ----------------------------------------
+ALTER TABLE public.habits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own habits."
+ON public.habits FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own habits."
+ON public.habits FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own habits."
+ON public.habits FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own habits."
+ON public.habits FOR DELETE
+USING (auth.uid() = user_id);
+
+-- ----------------------------------------
+-- RLS for: habit_logs
+-- ----------------------------------------
+ALTER TABLE public.habit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own habit logs."
+ON public.habit_logs FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own habit logs."
+ON public.habit_logs FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own habit logs."
+ON public.habit_logs FOR DELETE
+USING (auth.uid() = user_id);
+
+
+-- ----------------------------------------
+-- RLS for: user_quests
+-- ----------------------------------------
+ALTER TABLE public.user_quests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own quest progress."
+ON public.user_quests FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own quest progress."
+ON public.user_quests FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own quest progress."
+ON public.user_quests FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- ----------------------------------------
+-- RLS for: ai_memory
+-- ----------------------------------------
+ALTER TABLE public.ai_memory ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can access their own AI memory."
+ON public.ai_memory FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+
+-- =================================================================
+-- SEED DATA
+-- Populates the database with initial data for a better user experience.
+-- =================================================================
+
+-- ----------------------------------------
+-- SEED for: rewards (Shop Items)
+-- ----------------------------------------
+INSERT INTO public.rewards (name, description, cost, icon, category)
+VALUES
+  ('15-Minute Break', 'Take a guilt-free 15-minute break to relax, stretch, or do something you enjoy.', 50, '🧘', 'Relax'),
+  ('Listen to a Podcast', 'Enjoy an episode of your favorite podcast to unwind or learn something new.', 75, '🎧', 'Joy'),
+  ('Mindful Coffee/Tea', 'Savor a warm beverage without distractions. Focus on the taste, smell, and warmth.', 100, '☕', 'Relax'),
+  ('Deep Work Session', 'Block out 90 minutes for uninterrupted, focused work on your most important task.', 150, '🎯', 'Focus'),
+  ('Watch One TV Episode', 'Reward yourself with a single episode of a show you love.', 200, '📺', 'Joy'),
+  ('Read for 30 Minutes', 'Dive into a book for half an hour. Escape into a different world or learn a new skill.', 125, '📚', 'Growth'),
+  ('Plan a Fun Weekend', 'Spend some time planning an exciting activity for the upcoming weekend.', 250, '🎉', 'Joy'),
+  ('Buy a Small Treat', 'Treat yourself to something small, like a fancy coffee or a snack you''ve been craving.', 500, '🎁', 'Joy');
+
+-- ----------------------------------------
+-- SEED for: quests
+-- ----------------------------------------
+INSERT INTO public.quests (title, description, type, goals, rewards, background_image)
+VALUES
+  (
+    'The 7-Day Challenge',
+    'Prove your consistency by completing at least one task every day for a full week.',
+    'main',
+    '[{"description": "Complete a task daily", "target": 7, "type": "daily_task_streak"}]',
+    '{"xp": 500, "points": 100}',
+    'https://images.unsplash.com/photo-1522441815192-d9f04eb0615c?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=600'
+  ),
+  (
+    'Task Slayer',
+    'Demonstrate your productivity by completing a total of 20 tasks.',
+    'main',
+    '[{"description": "Complete 20 tasks", "target": 20, "type": "total_tasks_completed"}]',
+    '{"xp": 750, "points": 150}',
+    'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=600'
+  ),
+  (
+    'Mindful Start',
+    'Establish a mindful morning routine by meditating for 5 days in a row.',
+    'side',
+    '[{"description": "Meditate for 5 consecutive days", "target": 5, "type": "habit_streak", "habit_name": "Meditate"}]',
+    '{"xp": 250, "points": 50}',
+    'https://images.unsplash.com/photo-1506126613408-eca07ce68773?ixlib=rb-4.0.3&q=85&fm=jpg&crop=entropy&cs=srgb&w=600'
+  );
+
+-- =================================================================
+-- END OF SCRIPT
+-- =================================================================

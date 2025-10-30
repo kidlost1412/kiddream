@@ -1,0 +1,72 @@
+import { create } from 'zustand';
+import type { Habit } from '../types';
+import { supabase } from '../lib/supabaseClient';
+
+interface HabitState {
+  habits: Habit[];
+  fetchHabits: () => Promise<void>;
+  toggleHabitCompletion: (habitId: string, date: string, isCompleted: boolean) => Promise<void>;
+}
+
+export const useHabitStore = create<HabitState>((set, get) => ({
+  habits: [],
+  fetchHabits: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    
+    const { data, error } = await supabase
+      .from('habits')
+      .select(`
+        *,
+        habit_logs ( completed_at )
+      `)
+      .eq('user_id', session.user.id);
+      
+    if (error) {
+      console.error('Error fetching habits:', error);
+    } else {
+      // Map the data to our client-side Habit type
+      const mappedHabits: Habit[] = data.map(h => ({
+        id: h.id,
+        name: h.name,
+        icon: h.icon,
+        category: h.category as any,
+        goal: h.goal,
+        completions: h.habit_logs.reduce((acc, log) => {
+          acc[log.completed_at] = true;
+          return acc;
+        }, {} as { [date: string]: boolean }),
+        // Streak and completionRate would need to be calculated,
+        // ideally by a backend function for performance.
+        // For now, we'll use placeholder values.
+        streak: 0, // TODO: Calculate streak
+        completionRate: 0, // TODO: Calculate completion rate
+      }));
+      set({ habits: mappedHabits });
+    }
+  },
+  toggleHabitCompletion: async (habitId, date, isCompleted) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    if (isCompleted) {
+      // It's currently completed, so we need to delete the log
+      const { error } = await supabase
+        .from('habit_logs')
+        .delete()
+        .match({ habit_id: habitId, completed_at: date, user_id: session.user.id });
+      if (error) console.error("Error deleting habit log", error);
+
+    } else {
+      // It's not completed, so we need to insert a log
+      const { error } = await supabase
+        .from('habit_logs')
+        .insert({ habit_id: habitId, completed_at: date, user_id: session.user.id });
+      if (error) console.error("Error inserting habit log", error);
+    }
+    
+    // Refetch habits to get the latest state. A more optimized approach
+    // would be to update the state locally, but refetching is simpler and more robust.
+    get().fetchHabits();
+  },
+}));
