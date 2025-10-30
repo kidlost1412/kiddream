@@ -40,10 +40,10 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     const payload = mapAppTodoToDbInsert(newTodo);
     const { data, error } = await supabase
       .from('todos')
-      .insert([{
+      .insert({
         ...payload,
         user_id: session.user.id,
-      }])
+      } as any)
       .select()
       .single();
 
