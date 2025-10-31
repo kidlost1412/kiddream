@@ -17,12 +17,6 @@ const QuestsPage: React.FC = () => {
   const { user } = useAuthStore();
   const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
-  }, []);
 
   const mainQuests = useMemo(() => quests.filter(q => q.type === 'main'), [quests]);
   const sideQuests = useMemo(() => quests.filter(q => q.type === 'side'), [quests]);
@@ -48,15 +42,6 @@ const QuestsPage: React.FC = () => {
       setGenerating(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 md:p-8 lg:p-10">
-        <div className="h-10 w-48 bg-slate-700/50 animate-pulse rounded-lg mb-8" />
-        <TodoListSkeleton count={4} />
-      </div>
-    );
-  }
 
   return (
     <AnimatedPage className="p-6 md:p-8 lg:p-10">

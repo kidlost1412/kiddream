@@ -11,32 +11,16 @@ const ShopPage: React.FC = () => {
   const { user } = useAuthStore();
   const { items, fetchItems } = useShopStore();
   const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchItems();
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
   }, [fetchItems]);
 
   const filteredItems =
     filter === 'all' ? items : items.filter(item => item.category === filter);
 
   const categories = ['all', ...Array.from(new Set(items.map(item => item.category)))];
-
-  if (isLoading) {
-    return (
-      <div className="p-6 md:p-8 lg:p-10">
-        <div className="h-10 w-48 bg-slate-700/50 animate-pulse rounded-lg mb-8" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-            <div key={i} className="h-64 bg-slate-700/50 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <AnimatedPage className="p-6 md:p-8 lg:p-10">
