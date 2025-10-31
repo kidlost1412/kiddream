@@ -3,6 +3,7 @@ import Button from '../../ui/Button';
 import type { ShopItem } from '../../../types';
 import { useShopStore } from '../../../stores/useShopStore';
 import { useTranslation } from '../../../hooks/useTranslation';
+import { useToastStore } from '../../../stores/useToastStore';
 
 interface ShopItemCardProps {
     item: ShopItem;
@@ -24,17 +25,23 @@ const ShopItemCard: React.FC<ShopItemCardProps> = ({ item, userPoints }) => {
 
     const handlePurchase = async () => {
         if (!canAfford || loading) return;
-        
+
         setLoading(true);
         const result = await purchaseItem(item.id, item.cost);
-        
+
         if (result.success) {
-            const expiryMsg = (result as any).expiresAt 
-                ? `\n⏰ Hết hạn: ${new Date((result as any).expiresAt).toLocaleDateString('vi-VN')}`
+            const expiryMsg = (result as any).expiresAt
+                ? ` (Hết hạn: ${new Date((result as any).expiresAt).toLocaleDateString('vi-VN')})`
                 : '';
-            alert(`🎉 ${t('shop.purchaseSuccess', { name: item.name })}${expiryMsg}\n\n✅ Đã thêm vào kho đồ!`);
+            useToastStore.getState().push({
+                type: 'success',
+                message: `🎉 ${t('shop.purchaseSuccess', { name: item.name })}${expiryMsg}`
+            });
         } else {
-            alert(t('shop.purchaseError', { error: result.error || t('errors.generic') }));
+            useToastStore.getState().push({
+                type: 'error',
+                message: t('shop.purchaseError', { error: result.error || t('errors.generic') })
+            });
         }
         setLoading(false);
     };
