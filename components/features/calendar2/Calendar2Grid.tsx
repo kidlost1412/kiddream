@@ -5,6 +5,7 @@ import { useTranslation } from '../../../hooks/useTranslation';
 import Calendar2Event from './Calendar2Event';
 import TodoDetailModal from '../todos/TodoDetailModal';
 import ImprovedAddTodoModal from '../todos/ImprovedAddTodoModal';
+import { timeToMinutes, formatLocalDate, parseLocalDate } from '../../../utils/dateHelpers';
 
 interface Calendar2GridProps {
   startDate: Date;
@@ -18,11 +19,6 @@ const gridStartHour = 5;
 const gridEndHour = 22;
 
 const toHM = (m: number) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
-
-const timeToMinutes = (t: string) => {
-  const [h,m] = t.split(':').map(Number);
-  return h*60+m;
-};
 
 export default function Calendar2Grid({ startDate, daysToShow, searchTerm='', priorityFilter='all', tagFilter='' }: Calendar2GridProps) {
   const { todos } = useTodoStore();
@@ -68,13 +64,6 @@ export default function Calendar2Grid({ startDate, daysToShow, searchTerm='', pr
     return slots;
   }, [slotMinutes]);
 
-  const formatDateLocal = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
-  };
-
   const toggleSelect = (todo: Todo) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -96,10 +85,9 @@ export default function Calendar2Grid({ startDate, daysToShow, searchTerm='', pr
     for (const idStr of tasks) {
       const todoX = todos.find(t => String(t.id) === idStr);
       if (!todoX || !todoX.startTime || !todoX.endTime) continue;
-      let [y,m,day] = todoX.dueDate.split('-').map(Number);
-      const d = new Date(y, (m||1)-1, day||1);
+      const d = parseLocalDate(todoX.dueDate);
       if (deltaDays) d.setDate(d.getDate() + deltaDays);
-      const due = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const due = formatLocalDate(d);
       const s0 = timeToMinutes(todoX.startTime) + deltaMinutes;
       const e0 = timeToMinutes(todoX.endTime) + deltaMinutes;
       let ns = Math.max(minStart, Math.min(s0, maxEnd));
@@ -338,7 +326,7 @@ export default function Calendar2Grid({ startDate, daysToShow, searchTerm='', pr
   };
 
   const getTodosForDay = (d: Date) => {
-    const key = formatDateLocal(d);
+    const key = formatLocalDate(d);
     let list = todos.filter(t => t.dueDate === key);
     if (typeof priorityFilter === 'number') list = list.filter(t => t.priority === priorityFilter);
     const tag = tagFilter.trim().replace(/^#/, '').toLowerCase();
@@ -468,7 +456,7 @@ export default function Calendar2Grid({ startDate, daysToShow, searchTerm='', pr
                   const eh = Math.floor(endAbs / 60);
                   const em = endAbs % 60;
                   const pad = (n:number) => String(n).padStart(2,'0');
-                  setInitialDueDate(formatDateLocal(date));
+                  setInitialDueDate(formatLocalDate(date));
                   setInitialStartTime(`${pad(sh)}:${pad(sm)}`);
                   setInitialEndTime(`${pad(eh)}:${pad(em)}`);
                   setQuickAddOpen(true);

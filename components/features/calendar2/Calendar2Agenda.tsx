@@ -4,6 +4,7 @@ import { useTodoStore } from '../../../stores/useTodoStore';
 import { useTranslation } from '../../../hooks/useTranslation';
 import TodoDetailModal from '../todos/TodoDetailModal';
 import ImprovedAddTodoModal from '../todos/ImprovedAddTodoModal';
+import { formatLocalDate } from '../../../utils/dateHelpers';
 
 interface Calendar2AgendaProps {
   startDate: Date;
@@ -24,15 +25,8 @@ const Calendar2Agenda: React.FC<Calendar2AgendaProps> = ({ startDate, daysToShow
 
   const dates = useMemo(() => Array.from({ length: daysToShow }, (_, i) => { const d = new Date(startDate); d.setDate(startDate.getDate()+i); return d; }), [startDate, daysToShow]);
 
-  const formatDateLocal = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
-  };
-
   const getTodosForDay = (d: Date) => {
-    const key = formatDateLocal(d);
+    const key = formatLocalDate(d);
     let list = todos.filter(t => t.dueDate === key);
     if (typeof priorityFilter === 'number') list = list.filter(t => t.priority === priorityFilter);
     const tag = tagFilter.trim().replace(/^#/, '').toLowerCase();
@@ -81,7 +75,7 @@ const Calendar2Agenda: React.FC<Calendar2AgendaProps> = ({ startDate, daysToShow
                 ))}
               </div>
               <div className="px-4 py-2 border-t border-slate-700/40 text-right">
-                <button className="text-xs text-indigo-300 hover:text-indigo-200" onClick={() => { const pad = (n:number)=>String(n).padStart(2,'0'); const now = new Date(); setInitialDueDate(formatDateLocal(date)); setInitialStartTime(`${pad(now.getHours())}:${pad(now.getMinutes())}`); setInitialEndTime(`${pad(now.getHours()+1)}:${pad(now.getMinutes())}`); setQuickAddOpen(true); }}>+ Thêm nhanh</button>
+                <button className="text-xs text-indigo-300 hover:text-indigo-200" onClick={() => { const pad = (n:number)=>String(n).padStart(2,'0'); const now = new Date(); setInitialDueDate(formatLocalDate(date)); setInitialStartTime(`${pad(now.getHours())}:${pad(now.getMinutes())}`); setInitialEndTime(`${pad(now.getHours()+1)}:${pad(now.getMinutes())}`); setQuickAddOpen(true); }}>+ Thêm nhanh</button>
               </div>
             </div>
           );

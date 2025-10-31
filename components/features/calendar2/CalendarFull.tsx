@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import type { Todo } from '../../../types';
 import { useTodoStore } from '../../../stores/useTodoStore';
 import TodoDetailModal from '../todos/TodoDetailModal';
+import { formatLocalDate, parseLocalDate } from '../../../utils/dateHelpers';
 
 interface CalendarFullProps {
   startDate: Date;
@@ -14,13 +15,6 @@ interface CalendarFullProps {
   priorityFilter?: number | 'all';
   tagFilter?: string;
 }
-
-const formatDateLocal = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-};
 
 const toHM = (m: number) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
 
@@ -128,7 +122,7 @@ const CalendarFull: React.FC<CalendarFullProps> = ({ startDate, daysToShow, sear
           const t = info.event.extendedProps?.todo as Todo | undefined;
           if (!t) return;
           const s = info.event.start!; const e = info.event.end!;
-          const due = formatDateLocal(s);
+          const due = formatLocalDate(s);
           const startTime = `${String(s.getHours()).padStart(2,'0')}:${String(s.getMinutes()).padStart(2,'0')}`;
           const endTime = `${String(e.getHours()).padStart(2,'0')}:${String(e.getMinutes()).padStart(2,'0')}`;
           await updateTodo(t.id, { dueDate: due, startTime, endTime });
@@ -137,7 +131,7 @@ const CalendarFull: React.FC<CalendarFullProps> = ({ startDate, daysToShow, sear
           const t = info.event.extendedProps?.todo as Todo | undefined;
           if (!t) return;
           const s = info.event.start!; const e = info.event.end!;
-          const due = formatDateLocal(s);
+          const due = formatLocalDate(s);
           const startTime = `${String(s.getHours()).padStart(2,'0')}:${String(s.getMinutes()).padStart(2,'0')}`;
           const endTime = `${String(e.getHours()).padStart(2,'0')}:${String(e.getMinutes()).padStart(2,'0')}`;
           await updateTodo(t.id, { dueDate: due, startTime, endTime });
