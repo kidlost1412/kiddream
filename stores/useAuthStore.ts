@@ -18,6 +18,7 @@ interface AuthState {
   profile: Profile | null;
   setSession: (session: Session | null) => void;
   setProfile: (profile: Profile | null) => void;
+  fetchProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, username: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
@@ -56,6 +57,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ profile });
     const { session } = get();
     set({ user: mapToAppUser(session?.user, profile) });
+  },
+  fetchProfile: async () => {
+    const { session } = get();
+    if (!session?.user?.id) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!error && data) {
+      const profile: Profile = {
+        id: data.id,
+        username: data.username,
+        avatar_url: data.avatar_url,
+        level: data.level,
+        xp: data.xp,
+        points: data.points,
+      };
+      get().setProfile(profile);
+    }
   },
   signIn: async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
