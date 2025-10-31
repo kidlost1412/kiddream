@@ -10,18 +10,13 @@ import { AnimatedPage, StaggerContainer, AnimatedItem } from '../components/Anim
 import { TodoListSkeleton } from '../components/ui/Skeleton';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { useToastStore } from '../stores/useToastStore';
 
 const QuestsPage: React.FC = () => {
   const { quests, userQuests, fetchQuests } = useQuestStore();
   const { user } = useAuthStore();
   const { t } = useTranslation();
   const [generating, setGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
-  }, []);
 
   const mainQuests = useMemo(() => quests.filter(q => q.type === 'main'), [quests]);
   const sideQuests = useMemo(() => quests.filter(q => q.type === 'side'), [quests]);
@@ -40,23 +35,13 @@ const QuestsPage: React.FC = () => {
       const newQuests = await AIQuestService.generatePersonalizedQuests(user.id);
       await AIQuestService.saveQuestsToDatabase(newQuests);
       await fetchQuests();
-      alert(`✨ Đã tạo ${newQuests.length} nhiệm vụ mới dành riêng cho bạn!`);
+      useToastStore.getState().push({ type: 'success', message: `✨ Đã tạo ${newQuests.length} nhiệm vụ mới dành riêng cho bạn!` });
     } catch (error) {
-      console.error('Error generating quests:', error);
-      alert('❌ Không thể tạo nhiệm vụ. Vui lòng thử lại sau.');
+      useToastStore.getState().push({ type: 'error', message: 'Không thể tạo nhiệm vụ. Vui lòng thử lại sau.' });
     } finally {
       setGenerating(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="p-6 md:p-8 lg:p-10">
-        <div className="h-10 w-48 bg-slate-700/50 animate-pulse rounded-lg mb-8" />
-        <TodoListSkeleton count={4} />
-      </div>
-    );
-  }
 
   return (
     <AnimatedPage className="p-6 md:p-8 lg:p-10">

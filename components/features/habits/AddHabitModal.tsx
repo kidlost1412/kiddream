@@ -4,6 +4,7 @@ import { useHabitStore } from '../../../stores/useHabitStore';
 import { useTranslation } from '../../../hooks/useTranslation';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
+import { useToastStore } from '../../../stores/useToastStore';
 
 interface AddHabitModalProps {
   isOpen: boolean;
@@ -24,24 +25,24 @@ const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!name.trim()) {
-      alert(t('habits.createModal.validations.nameRequired'));
+      useToastStore.getState().push({ type: 'error', message: t('habits.createModal.validations.nameRequired') });
       return;
     }
-    
+
     if (!goal.trim()) {
-      alert(t('habits.createModal.validations.goalRequired'));
+      useToastStore.getState().push({ type: 'error', message: t('habits.createModal.validations.goalRequired') });
       return;
     }
-    
+
     setLoading(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert(t('errors.unauthorized'));
+        useToastStore.getState().push({ type: 'error', message: t('errors.unauthorized') });
         setLoading(false);
         return;
       }
@@ -60,16 +61,16 @@ const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose }) => {
 
       // Refresh habits list
       await fetchHabits();
-      
+
       // Reset form
       setName('');
       setIcon('🎯');
       setCategory('Productivity');
       setGoal('');
+      useToastStore.getState().push({ type: 'success', message: 'Đã tạo thói quen mới' });
       onClose();
     } catch (error) {
-      console.error('Error adding habit:', error);
-      alert(t('errors.generic'));
+      useToastStore.getState().push({ type: 'error', message: t('errors.generic') });
     } finally {
       setLoading(false);
     }

@@ -40,15 +40,7 @@ const DashboardPage: React.FC = () => {
   const { habits } = useHabitStore();
   const { t } = useTranslation();
 
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    // Simulate loading (in real app, this would be actual data fetching)
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const today = new Date().toISOString().split('T')[0];
+  const today = React.useMemo(() => new Date().toISOString().split('T')[0], []);
 
   type AgendaItemType = {
     id: string;
@@ -60,7 +52,7 @@ const DashboardPage: React.FC = () => {
     startTime?: string;
   };
 
-  const todaysAgenda: AgendaItemType[] = [
+  const todaysAgenda: AgendaItemType[] = React.useMemo(() => [
     ...todos.filter(t => t.dueDate === today),
     ...habits.map(h => ({
       task: h.name,
@@ -73,19 +65,12 @@ const DashboardPage: React.FC = () => {
     const timeA = 'startTime' in a && a.startTime ? a.startTime.replace(':', '') : '2359';
     const timeB = 'startTime' in b && b.startTime ? b.startTime.replace(':', '') : '2359';
     return parseInt(timeA) - parseInt(timeB);
-  });
+  }), [todos, habits, today]);
 
-  const overallHabitCompletion = Math.round(
-    habits.reduce((acc, h) => acc + h.completionRate, 0) / (habits.length || 1)
+  const overallHabitCompletion = React.useMemo(() =>
+    Math.round(habits.reduce((acc, h) => acc + h.completionRate, 0) / (habits.length || 1)),
+    [habits]
   );
-
-  if (isLoading) {
-    return (
-      <div className="p-6 md:p-8 lg:p-10">
-        <DashboardSkeleton />
-      </div>
-    );
-  }
 
   return (
     <AnimatedPage className="p-6 md:p-8 lg:p-10 space-y-8">

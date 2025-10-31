@@ -13,23 +13,6 @@ const HabitsPage: React.FC = () => {
   const { habits } = useHabitStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { t } = useTranslation();
-  const [isLoading, setIsLoading] = useState(true);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 300);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="p-6 md:p-8 lg:p-10">
-        <div className="mb-8">
-          <div className="h-10 w-48 bg-slate-700/50 animate-pulse rounded-lg mb-4" />
-        </div>
-        <TodoListSkeleton count={6} />
-      </div>
-    );
-  }
 
   return (
     <AnimatedPage className="p-6 md:p-8 lg:p-10">

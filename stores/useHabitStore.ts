@@ -26,22 +26,52 @@ export const useHabitStore = create<HabitState>((set, get) => ({
       console.error('Error fetching habits:', error);
     } else {
       // Map the data to our client-side Habit type
-      const mappedHabits: Habit[] = data.map(h => ({
-        id: h.id,
-        name: h.name,
-        icon: h.icon,
-        category: h.category as any,
-        goal: h.goal,
-        completions: h.habit_logs.reduce((acc, log) => {
+      const mappedHabits: Habit[] = data.map(h => {
+        const completions = h.habit_logs.reduce((acc, log) => {
           acc[log.completed_at] = true;
           return acc;
-        }, {} as { [date: string]: boolean }),
-        // Streak and completionRate would need to be calculated,
-        // ideally by a backend function for performance.
-        // For now, we'll use placeholder values.
-        streak: 0, // TODO: Calculate streak
-        completionRate: 0, // TODO: Calculate completion rate
-      }));
+        }, {} as { [date: string]: boolean });
+
+        // Calculate streak: consecutive days from today backwards
+        let streak = 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (let i = 0; i < 365; i++) {
+          const checkDate = new Date(today);
+          checkDate.setDate(today.getDate() - i);
+          const dateStr = checkDate.toISOString().split('T')[0];
+
+          if (completions[dateStr]) {
+            streak++;
+          } else if (i > 0) {
+            // Stop if we hit a day without completion (but allow today to be incomplete)
+            break;
+          }
+        }
+
+        // Calculate completion rate: % of last 30 days
+        let completedDays = 0;
+        const daysToCheck = 30;
+        for (let i = 0; i < daysToCheck; i++) {
+          const checkDate = new Date(today);
+          checkDate.setDate(today.getDate() - i);
+          const dateStr = checkDate.toISOString().split('T')[0];
+          if (completions[dateStr]) completedDays++;
+        }
+        const completionRate = Math.round((completedDays / daysToCheck) * 100);
+
+        return {
+          id: h.id,
+          name: h.name,
+          icon: h.icon,
+          category: h.category as any,
+          goal: h.goal,
+          completions,
+          streak,
+          completionRate,
+        };
+      });
       set({ habits: mappedHabits });
     }
   },

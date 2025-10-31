@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import { AnimatedPage, StaggerContainer, AnimatedItem } from '../components/AnimatedPage';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
+import { useToastStore } from '../stores/useToastStore';
 
 const InventoryPage: React.FC = () => {
   const { items, loading, fetchInventory, useItem } = useInventoryStore();
@@ -25,11 +26,11 @@ const InventoryPage: React.FC = () => {
   const handleUseItem = async (inventoryId: string) => {
     setUsingItemId(inventoryId);
     const result = await useItem(inventoryId);
-    
+
     if (result.success) {
-      alert('✅ Đã sử dụng vật phẩm thành công!');
+      useToastStore.getState().push({ type: 'success', message: '✅ Đã sử dụng vật phẩm thành công!' });
     } else {
-      alert(`❌ ${result.error}`);
+      useToastStore.getState().push({ type: 'error', message: result.error || 'Không thể sử dụng vật phẩm' });
     }
     setUsingItemId(null);
   };

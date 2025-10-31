@@ -3,6 +3,7 @@ import { useTodoStore } from '../../../stores/useTodoStore';
 import { TodoPriority } from '../../../types';
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
+import { useToastStore } from '../../../stores/useToastStore';
 
 interface AddTodoModalProps {
   isOpen: boolean;
@@ -21,18 +22,18 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!task.trim()) {
-      alert('Task name is required');
+      useToastStore.getState().push({ type: 'error', message: 'Tên công việc là bắt buộc' });
       return;
     }
-    
+
     if (startTime && endTime && startTime >= endTime) {
-      alert('End time must be after start time');
+      useToastStore.getState().push({ type: 'error', message: 'Thời gian kết thúc phải sau thời gian bắt đầu' });
       return;
     }
-    
+
     setLoading(true);
 
     try {
@@ -45,7 +46,7 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose }) => {
         priority,
         stakes: { reward: 10, penalty: 5 },
       });
-      
+
       // Reset form
       setTask('');
       setDescription('');
@@ -53,10 +54,10 @@ const AddTodoModal: React.FC<AddTodoModalProps> = ({ isOpen, onClose }) => {
       setStartTime('09:00');
       setEndTime('10:00');
       setPriority(TodoPriority.Medium);
+      useToastStore.getState().push({ type: 'success', message: 'Đã tạo công việc mới' });
       onClose();
     } catch (error) {
-      console.error('Error adding todo:', error);
-      alert('Failed to add task. Please try again.');
+      useToastStore.getState().push({ type: 'error', message: 'Không thể tạo công việc. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
