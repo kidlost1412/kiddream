@@ -41,10 +41,9 @@ const QuestsPage: React.FC = () => {
       const newQuests = await AIQuestService.generatePersonalizedQuests(user.id);
       await AIQuestService.saveQuestsToDatabase(newQuests);
       await fetchQuests();
-      alert(`✨ Đã tạo ${newQuests.length} nhiệm vụ mới dành riêng cho bạn!`);
+      useToastStore.getState().push({ type: 'success', message: `✨ Đã tạo ${newQuests.length} nhiệm vụ mới dành riêng cho bạn!` });
     } catch (error) {
-      console.error('Error generating quests:', error);
-      alert('❌ Không thể tạo nhiệm vụ. Vui lòng thử lại sau.');
+      useToastStore.getState().push({ type: 'error', message: 'Không thể tạo nhiệm vụ. Vui lòng thử lại sau.' });
     } finally {
       setGenerating(false);
     }
