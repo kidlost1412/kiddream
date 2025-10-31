@@ -10,6 +10,7 @@ import { AnimatedPage, StaggerContainer, AnimatedItem } from '../components/Anim
 import { TodoListSkeleton } from '../components/ui/Skeleton';
 import { motion } from 'framer-motion';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { useToastStore } from '../stores/useToastStore';
 
 const QuestsPage: React.FC = () => {
   const { quests, userQuests, fetchQuests } = useQuestStore();
